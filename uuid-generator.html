@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UUID 產生器</title>
+<style>
+  :root {
+    --bg: #f7f6f3;
+    --card-bg: #ffffff;
+    --border: #e0ddd6;
+    --text-primary: #2c2c2a;
+    --text-secondary: #5f5e5a;
+    --accent: #378ADD;
+    --accent-dark: #0c447c;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 24px 16px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text-primary);
+    display: flex;
+    justify-content: center;
+  }
+  .container {
+    width: 100%;
+    max-width: 640px;
+  }
+  h1 {
+    font-size: 22px;
+    font-weight: 500;
+    margin: 0 0 4px;
+  }
+  p.subtitle {
+    font-size: 14px;
+    color: var(--text-secondary);
+    margin: 0 0 24px;
+  }
+  .controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 20px;
+  }
+  select, input[type="number"] {
+    height: 40px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--card-bg);
+    padding: 0 10px;
+    font-size: 14px;
+    color: var(--text-primary);
+  }
+  select { flex: 1; }
+  input[type="number"] { width: 80px; text-align: center; }
+  button {
+    height: 40px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--card-bg);
+    padding: 0 16px;
+    font-size: 14px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+    transition: background 0.15s;
+  }
+  button:hover { background: #f0efe9; }
+  button:active { transform: scale(0.98); }
+  #gen {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+  }
+  #gen:hover { background: var(--accent-dark); }
+  #list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 14px;
+  }
+  .row code {
+    font-family: "SF Mono", Consolas, Monaco, monospace;
+    font-size: 13px;
+    flex: 1;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+  .copy-btn {
+    height: 32px;
+    width: 32px;
+    padding: 0;
+    justify-content: center;
+    flex-shrink: 0;
+    font-size: 14px;
+  }
+  .copy-btn.copied {
+    background: #e1f5ee;
+    border-color: #5dcaa5;
+    color: #085041;
+  }
+  .toolbar {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 16px;
+  }
+  .toolbar button {
+    font-size: 13px;
+    color: var(--text-secondary);
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>UUID 產生器</h1>
+  <p class="subtitle">產生 UUID v4（隨機）或 v7（依時間排序），點擊即可複製。</p>
+
+  <div class="controls">
+    <select id="version">
+      <option value="v4">UUID v4（隨機）</option>
+      <option value="v7">UUID v7（可排序）</option>
+    </select>
+    <input type="number" id="count" value="2" min="1" max="100000000" />
+    <button id="gen">產生</button>
+  </div>
+
+  <div id="list"></div>
+
+  <div class="toolbar">
+    <button id="copyAll">複製全部</button>
+  </div>
+</div>
+
+<script>
+function uuidv4() {
+  if (crypto.randomUUID) return crypto.randomUUID();
+  // fallback
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
+function uuidv7() {
+  const ts = BigInt(Date.now());
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  bytes[0] = Number((ts >> 40n) & 0xffn);
+  bytes[1] = Number((ts >> 32n) & 0xffn);
+  bytes[2] = Number((ts >> 24n) & 0xffn);
+  bytes[3] = Number((ts >> 16n) & 0xffn);
+  bytes[4] = Number((ts >> 8n) & 0xffn);
+  bytes[5] = Number(ts & 0xffn);
+  bytes[6] = (bytes[6] & 0x0f) | 0x70;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = [...bytes].map(function (b) { return b.toString(16).padStart(2, '0'); }).join('');
+  return hex.slice(0, 8) + '-' + hex.slice(8, 12) + '-' + hex.slice(12, 16) + '-' + hex.slice(16, 20) + '-' + hex.slice(20);
+}
+
+function copyText(text, btn, doneHtml, originalHtml) {
+  function markCopied() {
+    btn.innerHTML = doneHtml;
+    btn.classList.add('copied');
+    setTimeout(function () {
+      btn.innerHTML = originalHtml;
+      btn.classList.remove('copied');
+    }, 1200);
+  }
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(markCopied).catch(function () {
+      fallbackCopy(text);
+      markCopied();
+    });
+  } else {
+    fallbackCopy(text);
+    markCopied();
+  }
+}
+
+function fallbackCopy(text) {
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.select();
+  try { document.execCommand('copy'); } catch (e) {}
+  document.body.removeChild(ta);
+}
+
+function render() {
+  const version = document.getElementById('version').value;
+  const countInput = document.getElementById('count');
+  const count = Math.min(100, Math.max(1, parseInt(countInput.value, 10) || 1));
+  countInput.value = count;
+  const list = document.getElementById('list');
+  list.innerHTML = '';
+
+  for (let i = 0; i < count; i++) {
+    const id = version === 'v4' ? uuidv4() : uuidv7();
+
+    const row = document.createElement('div');
+    row.className = 'row';
+
+    const code = document.createElement('code');
+    code.textContent = id;
+
+    const btn = document.createElement('button');
+    btn.className = 'copy-btn';
+    btn.setAttribute('aria-label', '複製');
+    const originalHtml = '⧉';
+    const doneHtml = '✓';
+    btn.innerHTML = originalHtml;
+    btn.onclick = function () {
+      copyText(id, btn, doneHtml, originalHtml);
+    };
+
+    row.appendChild(code);
+    row.appendChild(btn);
+    list.appendChild(row);
+  }
+}
+
+document.getElementById('gen').addEventListener('click', render);
+document.getElementById('version').addEventListener('change', render);
+document.getElementById('copyAll').addEventListener('click', function () {
+  const ids = Array.from(document.querySelectorAll('#list code')).map(function (el) { return el.textContent; });
+  const text = ids.join('\n');
+  const btn = document.getElementById('copyAll');
+  const original = btn.textContent;
+  copyText(text, btn, '已複製全部', original);
+});
+
+render();
+</script>
+</body>
+</html>
